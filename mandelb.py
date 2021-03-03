@@ -49,9 +49,9 @@ def get_iterations(pixel: gph.Point) -> int:
 def get_color(its) -> Tuple[int, int, int]:
     cols = [(0, 0, 102), (0, 0, 153), (0, 0, 204), (0, 0, 255)]
 
-    if its < 5:
+    if its < 3:
         return cols[0]
-    elif its < 10:
+    elif its < 7:
         return cols[1]
     elif its < 15:
         return cols[2]
