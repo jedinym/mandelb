@@ -1,18 +1,21 @@
-from typing import Tuple
-from collections import defaultdict
-import graphics as gph
+from typing import Tuple, List
 from math import sqrt
 from PIL import Image
 import argparse as ap
+from multiprocessing import Pool
+
+
+Pixel = Tuple[int, int]
 
 
 MAX_ITERATIONS = 1000
 WIDTH = 3000
 HEIGHT = 3000
+THREADS = 4
 
-#parser = ap.ArgumentParser()
+# parser = ap.ArgumentParser()
 
-#parser.add_argument('-w', '--width', type=int)
+# parser.add_argument('-w', '--width', type=int)
 
 
 def get_mag(num: complex) -> float:
@@ -23,9 +26,9 @@ def scale(num, size):
     return (num - (size // 2)) / (size / 4)
 
 
-def get_iterations(pixel: gph.Point) -> int:
-    a = scale(pixel.getX(), WIDTH)
-    b = scale(pixel.getY(), HEIGHT)
+def get_iterations(pixel: Pixel) -> int:
+    a = scale(pixel[0], WIDTH)
+    b = scale(pixel[1], HEIGHT)
 
     c = complex(a, b)
     z = complex(0, 0)
@@ -49,6 +52,9 @@ def get_iterations(pixel: gph.Point) -> int:
 def get_color(its) -> Tuple[int, int, int]:
     cols = [(0, 0, 102), (0, 0, 153), (0, 0, 204), (0, 0, 255)]
 
+    if its == 1000:
+        return (0, 0, 0)
+
     if its < 3:
         return cols[0]
     elif its < 7:
@@ -59,26 +65,70 @@ def get_color(its) -> Tuple[int, int, int]:
     return cols[3]
 
 
-if __name__ == "__main__":
+def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
+        -> List[Tuple[Pixel, int]]:
+
+    ul_bound, lr_bound = bounds
+
+    x0, y0 = ul_bound
+    x1, y1 = lr_bound
+
+    it_list = []
+
+    for x in range(x0, x1):
+        for y in range(y0, y1):
+            pixel = (x, y)
+            it_list.append((pixel, get_iterations(pixel)))
+
+    return it_list
+
+
+def build_image(it_map: List[Tuple[Pixel, int]]) -> Image:
     img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
 
-    itsh = defaultdict(lambda: 0)
+    for pixel, iters in it_map:
+        img.putpixel(pixel, get_color(iters))
 
-    for x in range(WIDTH):
-        for y in range(HEIGHT):
-            p = gph.Point(x, y)
+    return img
 
-            its = get_iterations(p)
 
-            itsh[its] += 1
+def generateMSImage(filepath: str) -> None:
+    pl = Pool(THREADS)
+    bound_list = [((0, 0), (WIDTH//2, HEIGHT//2)),
+                  ((WIDTH//2, 0), (WIDTH, HEIGHT//2)),
+                  ((0, HEIGHT//2), (WIDTH//2, HEIGHT)),
+                  ((WIDTH // 2, HEIGHT//2), (WIDTH, HEIGHT))]
 
-            if its == MAX_ITERATIONS:
-                img.putpixel((x, y), (0, 0, 0))
-            else:
-                img.putpixel((x, y), get_color(its))
+    itmaps = pl.map(build_mandelbrot_bounds, bound_list)
 
-    img.save('mandelb.png')
+    im = itmaps[0] + itmaps[1] + itmaps[2] + itmaps[3]
 
-    with open("histo.txt", 'w') as file:
-        for it, n_it in itsh.items():
-            file.write(f"{it} : {n_it}\n")
+    img = build_image(im)
+
+    img.save(filepath)
+
+
+if __name__ == "__main__":
+    pass
+    # img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
+
+    # itsh = defaultdict(lambda: 0)
+
+    # for x in range(WIDTH):
+    #     for y in range(HEIGHT):
+    #         p = gph.Point(x, y)
+
+    #         #its = get_iterations(p)
+
+    #         #itsh[its] += 1
+
+    #         if its == MAX_ITERATIONS:
+    #             img.putpixel((x, y), (0, 0, 0))
+    #         else:
+    #             img.putpixel((x, y), get_color(its))
+
+    # img.save('mandelb.png')
+
+    # with open("histo.txt", 'w') as file:
+    #     for it, n_it in itsh.items():
+    #         file.write(f"{it} : {n_it}\n")
