@@ -1,11 +1,18 @@
+from typing import Tuple
+from collections import defaultdict
 import graphics as gph
 from math import sqrt
 from PIL import Image
+import argparse as ap
 
 
 MAX_ITERATIONS = 1000
-WIDTH = 2000
-HEIGHT = 2000
+WIDTH = 3000
+HEIGHT = 3000
+
+#parser = ap.ArgumentParser()
+
+#parser.add_argument('-w', '--width', type=int)
 
 
 def get_mag(num: complex) -> float:
@@ -39,15 +46,39 @@ def get_iterations(pixel: gph.Point) -> int:
     return iters
 
 
-img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
+def get_color(its) -> Tuple[int, int, int]:
+    cols = [(0, 0, 102), (0, 0, 153), (0, 0, 204), (0, 0, 255)]
 
-for x in range(WIDTH):
-    for y in range(HEIGHT):
-        p = gph.Point(x, y)
+    if its < 5:
+        return cols[0]
+    elif its < 10:
+        return cols[1]
+    elif its < 15:
+        return cols[2]
 
-        its = get_iterations(p)
+    return cols[3]
 
-        if its == MAX_ITERATIONS:
-            img.putpixel((x, y), (0, 0, 0))
 
-img.save('mandelb.png')
+if __name__ == "__main__":
+    img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
+
+    itsh = defaultdict(lambda: 0)
+
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
+            p = gph.Point(x, y)
+
+            its = get_iterations(p)
+
+            itsh[its] += 1
+
+            if its == MAX_ITERATIONS:
+                img.putpixel((x, y), (0, 0, 0))
+            else:
+                img.putpixel((x, y), get_color(its))
+
+    img.save('mandelb.png')
+
+    with open("histo.txt", 'w') as file:
+        for it, n_it in itsh.items():
+            file.write(f"{it} : {n_it}\n")
