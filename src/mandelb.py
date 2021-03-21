@@ -4,19 +4,17 @@ from math import sqrt
 from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
+import ctypes as cp
+from os import getcwd
 
 
 Pixel = Tuple[int, int]
 
 
 MAX_ITERATIONS = 1000
-WIDTH = 3000
-HEIGHT = 3000
+WIDTH = 2000
+HEIGHT = 2000
 THREADS = 4
-
-# parser = ap.ArgumentParser()
-
-# parser.add_argument('-w', '--width', type=int)
 
 
 def get_mag(num: complex) -> float:
@@ -76,10 +74,16 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
 
     it_list = []
 
+    lib = cp.cdll.LoadLibrary(getcwd() + '/mandelb.so')
+    c_get_its = lib.c_get_iterations
+    c_get_its.restype = cp.c_int
+
     for x in range(x0, x1):
         for y in range(y0, y1):
             pixel = (x, y)
-            it_list.append((pixel, get_iterations(pixel)))
+            iters = c_get_its(x, y, WIDTH, HEIGHT, MAX_ITERATIONS)
+            # it_list.append((pixel, get_iterations(pixel)))
+            it_list.append((pixel, iters))
 
     return it_list
 
@@ -110,5 +114,23 @@ def generateMSImage(filepath: str) -> None:
 
 
 if __name__ == "__main__":
-    cProfile.run(r'generateMSImage("x.png")')
-    pass
+    parser = ap.ArgumentParser()
+    parser.add_argument('-s,', '--size', required=True,
+                        help='Size of the resulting image.')
+    parser.add_argument('-o', '--output', required=False,
+                        help='Output filepath.')
+
+    parser.add_argument('filepath')
+    args = vars(parser.parse_args())
+
+    if args['output'] is not None:
+        output = args['output']
+    else:
+        output = args['filepath']
+
+    WIDTH = int(args['size'])
+    HEIGHT = int(args['size'])
+
+    generateMSImage(output)
+
+    # cProfile.run(r'generateMSImage("x.png")')
