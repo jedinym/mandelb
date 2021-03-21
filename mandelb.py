@@ -1,4 +1,5 @@
 from typing import Tuple, List
+import cProfile
 from math import sqrt
 from PIL import Image
 import argparse as ap
@@ -109,26 +110,5 @@ def generateMSImage(filepath: str) -> None:
 
 
 if __name__ == "__main__":
+    cProfile.run(r'generateMSImage("x.png")')
     pass
-    # img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
-
-    # itsh = defaultdict(lambda: 0)
-
-    # for x in range(WIDTH):
-    #     for y in range(HEIGHT):
-    #         p = gph.Point(x, y)
-
-    #         #its = get_iterations(p)
-
-    #         #itsh[its] += 1
-
-    #         if its == MAX_ITERATIONS:
-    #             img.putpixel((x, y), (0, 0, 0))
-    #         else:
-    #             img.putpixel((x, y), get_color(its))
-
-    # img.save('mandelb.png')
-
-    # with open("histo.txt", 'w') as file:
-    #     for it, n_it in itsh.items():
-    #         file.write(f"{it} : {n_it}\n")
