@@ -111,4 +111,3 @@ def generateMSImage(filepath: str) -> None:
 
 if __name__ == "__main__":
     cProfile.run(r'generateMSImage("x.png")')
-    pass
