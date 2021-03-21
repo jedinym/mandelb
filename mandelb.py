@@ -10,13 +10,9 @@ Pixel = Tuple[int, int]
 
 
 MAX_ITERATIONS = 1000
-WIDTH = 3000
-HEIGHT = 3000
+WIDTH = 2000
+HEIGHT = 2000
 THREADS = 4
-
-# parser = ap.ArgumentParser()
-
-# parser.add_argument('-w', '--width', type=int)
 
 
 def get_mag(num: complex) -> float:
