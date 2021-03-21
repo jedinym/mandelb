@@ -19,7 +19,7 @@ double scale(int num, int size)
 }
 
 
-int get_iterations(int x, int y, int width, int height, int max_iters)
+int c_get_iterations(int x, int y, int width, int height, int max_iters)
 {
     int iters = 0;
 

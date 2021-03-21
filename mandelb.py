@@ -4,6 +4,8 @@ from math import sqrt
 from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
+import ctypes as cp
+from os import getcwd
 
 
 Pixel = Tuple[int, int]
@@ -72,10 +74,16 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
 
     it_list = []
 
+    lib = cp.cdll.LoadLibrary(getcwd() + '/mandelb.so')
+    c_get_its = lib.c_get_iterations
+    c_get_its.restype = cp.c_int
+
     for x in range(x0, x1):
         for y in range(y0, y1):
             pixel = (x, y)
-            it_list.append((pixel, get_iterations(pixel)))
+            iters = c_get_its(x, y, WIDTH, HEIGHT, MAX_ITERATIONS)
+            # it_list.append((pixel, get_iterations(pixel)))
+            it_list.append((pixel, iters))
 
     return it_list
 
