@@ -114,4 +114,23 @@ def generateMSImage(filepath: str) -> None:
 
 
 if __name__ == "__main__":
-    cProfile.run(r'generateMSImage("x.png")')
+    parser = ap.ArgumentParser()
+    parser.add_argument('-s,', '--size', required=True,
+                        help='Size of the resulting image.')
+    parser.add_argument('-o', '--output', required=False,
+                        help='Output filepath.')
+
+    parser.add_argument('filepath')
+    args = vars(parser.parse_args())
+
+    if args['output'] is not None:
+        output = args['output']
+    else:
+        output = args['filepath']
+
+    WIDTH = int(args['size'])
+    HEIGHT = int(args['size'])
+
+    generateMSImage(output)
+
+    # cProfile.run(r'generateMSImage("x.png")')

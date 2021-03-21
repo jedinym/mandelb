@@ -1,10 +1,10 @@
-#include "mandelb.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
 #include <complex.h>
+#include "mandelb.h"
 
 int main(void)
 {
@@ -28,7 +28,6 @@ int c_get_iterations(int x, int y, int width, int height, int max_iters)
 
     double complex c = scaledX + scaledY * I;
     double complex z = 0.0 + 0.0 * I;
-
     
     //printf("%lf + %lf *i\n", creal(c), cimag(c));
 
