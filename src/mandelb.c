@@ -14,12 +14,12 @@ double scale(int num, int size)
 }
 
 
-int c_get_iterations(int x, int y, int width, int height, int max_iters)
+int c_get_iterations(int x, int y, double coefficient, int max_iters)
 {
     int iters = 0;
 
-    double scaledX = scale(x, width);
-    double scaledY = scale(y, height);
+    double scaledX = x * coefficient;//scale(x, width);
+    double scaledY = y * coefficient;//scale(y, height);
 
     double complex c = scaledX + scaledY * I;
     double complex z = 0.0 + 0.0 * I;
