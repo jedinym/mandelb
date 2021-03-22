@@ -6,11 +6,6 @@
 #include <complex.h>
 #include "mandelb.h"
 
-int main(void)
-{
-    //printf("%d", get_iterations(1000, 1000, 2000, 2000, 1000));
-    return 0;
-}
 
 double scale(int num, int size)
 {
