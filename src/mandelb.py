@@ -2,12 +2,12 @@
 
 from typing import Tuple, List
 import cProfile
-from math import sqrt
 from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
 import ctypes as cp
 from os import getcwd
+import pygame as pg
 
 
 Pixel = Tuple[int, int]
@@ -22,7 +22,7 @@ THREADS = 4
 def get_color(its: int) -> Tuple[int, int, int]:
     cols = [(0, 0, 102), (0, 0, 153), (0, 0, 204), (0, 0, 255)]
 
-    if its == 1000:
+    if its == MAX_ITERATIONS:
         return (0, 0, 0)
 
     if its < 3:
@@ -69,10 +69,10 @@ def build_image(it_map: List[Tuple[Pixel, int]]) -> Image:
 
 def generateMSImage(filepath: str) -> None:
     pl = Pool(THREADS)
-    bound_list = [((0, 0), (WIDTH//2, HEIGHT//2)),
-                  ((WIDTH//2, 0), (WIDTH, HEIGHT//2)),
-                  ((0, HEIGHT//2), (WIDTH//2, HEIGHT)),
-                  ((WIDTH // 2, HEIGHT//2), (WIDTH, HEIGHT))]
+    bound_list = [((0, 0), (WIDTH // 2, HEIGHT // 2)),
+                  ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2)),
+                  ((0, HEIGHT // 2), (WIDTH // 2, HEIGHT)),
+                  ((WIDTH // 2, HEIGHT // 2), (WIDTH, HEIGHT))]
 
     itmaps = pl.map(build_mandelbrot_bounds, bound_list)
 
@@ -83,7 +83,38 @@ def generateMSImage(filepath: str) -> None:
     img.save(filepath)
 
 
-if __name__ == "__main__":
+def interactive_session() -> None:
+    # lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
+    # c_get_its = lib.c_get_iterations
+    # c_get_its.restype = cp.c_int
+
+    pl = Pool(THREADS)
+    bound_list = [((0, 0), (WIDTH // 2, HEIGHT // 2)),
+                  ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2)),
+                  ((0, HEIGHT // 2), (WIDTH // 2, HEIGHT)),
+                  ((WIDTH // 2, HEIGHT // 2), (WIDTH, HEIGHT))]
+
+    size = WIDTH, HEIGHT
+
+    screen = pg.display.set_mode(size)
+
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                exit(0)
+
+        itmaps = pl.map(build_mandelbrot_bounds, bound_list)
+
+        it_map = itmaps[0] + itmaps[1] + itmaps[2] + itmaps[3]
+
+        for pixel, iters in it_map:
+            point = pg.Rect(pixel, (1, 1))
+            pg.draw.rect(screen, get_color(iters), point)
+
+        pg.display.flip()
+
+
+def init_parser() -> ap.ArgumentParser:
     parser = ap.ArgumentParser()
     parser.add_argument('-s,', '--size', required=True,
                         help='Size of the resulting image')
@@ -94,14 +125,25 @@ if __name__ == "__main__":
                         help='cProfile output to stdin')
     parser.add_argument('-m', '--max-iterations',
                         help='Maximum mandelb. set iterations')
+    parser.add_argument('-i', '--interactive', action='store_const',
+                        const='interactive')
 
-    parser.add_argument('filepath', help='Output filepath')
+    parser.add_argument('filepath', nargs='?',
+                        default=None,
+                        help='Output filepath')
+
+    return parser
+
+
+if __name__ == "__main__":
+    parser = init_parser()
     args = vars(parser.parse_args())
 
-    if args['output'] is not None:
-        output = args['output']
-    else:
-        output = args['filepath']
+    if args['interactive'] is None:
+        if args['output'] is not None:
+            output = args['output']
+        else:
+            output = args['filepath']
 
     if args['max_iterations'] is not None:
         MAX_ITERATIONS = int(args['max_iterations'])
@@ -111,5 +153,9 @@ if __name__ == "__main__":
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
+        exit(0)
+
+    if args['interactive'] is not None:
+        interactive_session()
     else:
         generateMSImage(output)
