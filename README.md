@@ -6,4 +6,4 @@ App for generating and visualizing the Mandelbrot set.
 
 e.g. `./mandelb.py -s 1000 out.png`
 
-See `./mandelb -h` for more.
+See `./mandelb.py -h` for more.
