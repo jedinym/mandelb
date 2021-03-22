@@ -2,3 +2,7 @@
 *.jpeg
 *.jpg
 *.bmp
+*.o
+*.txt
+.vscode/
+CMakeLists.txt
