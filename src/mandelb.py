@@ -19,37 +19,6 @@ HEIGHT = 0
 THREADS = 4
 
 
-def get_mag(num: complex) -> float:
-    return sqrt(num.real ** 2 + num.imag ** 2)
-
-
-def scale(num: int, size: int) -> float:
-    return (num - (size // 2)) / (size / 4)
-
-
-def get_iterations(pixel: Pixel) -> int:
-    a = scale(pixel[0], WIDTH)
-    b = scale(pixel[1], HEIGHT)
-
-    c = complex(a, b)
-    z = complex(0, 0)
-    iters = 0
-
-    traversed = set()
-
-    while get_mag(z) <= 2 and iters < MAX_ITERATIONS:
-        z = z**2 + c
-
-        if z in traversed:
-            return MAX_ITERATIONS
-
-        traversed.add(z)
-
-        iters += 1
-
-    return iters
-
-
 def get_color(its: int) -> Tuple[int, int, int]:
     cols = [(0, 0, 102), (0, 0, 153), (0, 0, 204), (0, 0, 255)]
 
@@ -84,7 +53,6 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
         for y in range(y0, y1):
             pixel = (x, y)
             iters = c_get_its(x, y, WIDTH, HEIGHT, MAX_ITERATIONS)
-            # it_list.append((pixel, get_iterations(pixel)))
             it_list.append((pixel, iters))
 
     return it_list
@@ -124,6 +92,8 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--benchmark', action='store_const',
                         const='benchmark',
                         help='cProfile output to stdin')
+    parser.add_argument('-m', '--max-iterations',
+                        help='Maximum mandelb. set iterations')
 
     parser.add_argument('filepath', help='Output filepath')
     args = vars(parser.parse_args())
@@ -132,6 +102,9 @@ if __name__ == "__main__":
         output = args['output']
     else:
         output = args['filepath']
+
+    if args['max_iterations'] is not None:
+        MAX_ITERATIONS = int(args['max_iterations'])
 
     WIDTH = int(args['size'])
     HEIGHT = int(args['size'])
