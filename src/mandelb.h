@@ -18,7 +18,7 @@ typedef struct Complex
     double imag;
 }Complex;
 
-int c_get_iterations(double scaled_x, double scaled_y, int max_iters);
+int c_get_iterations(long double scaled_x, long double scaled_y, int max_iters);
 
 PixelIterations* build_mb_bounds(Pixel *ul_bound, Pixel *lr_bound);
 double scale(int num, int size);

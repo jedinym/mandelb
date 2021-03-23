@@ -67,8 +67,10 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
 
             # print(f"x: {scaled_x}  y: {scaled_y}")
 
-            iters = c_get_its(cp.c_double(scaled_x), cp.c_double(scaled_y),
+            iters = c_get_its(cp.c_longdouble(scaled_x),
+                              cp.c_longdouble(scaled_y),
                               MAX_ITERATIONS)
+
             it_list.append((pixel, iters))
 
     return it_list
