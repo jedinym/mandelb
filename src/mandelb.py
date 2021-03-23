@@ -101,7 +101,20 @@ def generateMSImage(filepath: str) -> None:
     img.save(filepath)
 
 
-def interactive_session() -> None:
+def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
+    color_dict = dict()
+    with open(filepath, 'r') as file:
+        for line in file.readlines():
+            line_split = line.split(',')
+            color_dict[int(line_split[0])] = (int(line_split[1]),
+                                              int(line_split[2]),
+                                              int(line_split[3].rstrip()))
+
+    color_dict[MAX_ITERATIONS] = (0, 0, 0)
+    return color_dict
+
+
+def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
     # lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
     # c_get_its = lib.c_get_iterations
     # c_get_its.restype = cp.c_int
@@ -120,6 +133,8 @@ def interactive_session() -> None:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 exit(0)
+            if event.type == pg.MOUSEBUTTONDOWN:
+                pass
 
         itmaps = pl.map(build_mandelbrot_bounds, bound_list)
 
@@ -156,7 +171,6 @@ def get_args() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    
     args = get_args()
 
     if args['interactive'] is None:
@@ -177,6 +191,7 @@ if __name__ == "__main__":
         exit(0)
 
     if args['interactive'] is not None:
-        interactive_session()
+        color_dict = load_colors('colors.txt')
+        interactive_session(color_dict)
     else:
         generateMSImage(output)
