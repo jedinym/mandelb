@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from typing import Any, Tuple, List, Dict
+from typing import Sized, Tuple, List, Dict
 import cProfile
 from PIL import Image
 import argparse as ap
@@ -14,29 +14,47 @@ from itertools import chain
 
 
 Pixel = Tuple[int, int]
+PixelDiverList = List[Tuple[Pixel, int]]
+Bound = Tuple[Pixel, Pixel]
+View = Tuple[float, float]
 
 
 MAX_ITERATIONS = 1000
+CHUNK_COUNT = 32  # how many chunks to create
 WIDTH = 0
 HEIGHT = 0
 SIZE = 0
 
 
-def get_bound_list(n: int) -> List[Tuple[Pixel, Pixel]]:
-    x_step = SIZE // n  # FIXME: what if not divisible? fix l8r.
+def get_bound_list(n: int) -> List[Bound]:
+    """Divide the screen/view into <n> chunks for faster processing.
+
+    Return a list of bounds -> (<topleft_pixel>, <bottomright_pixel>)
+    """
+    # TODO: this might be wrong
+    x_step = SIZE // n
+    diff = SIZE % n
+
     x_pos = 0
 
-    bound_list = []
+    bound_list: List[Bound] = []
 
-    for x in range(n):
+    for x in range(n - 1):
         bound_list.append(((x_pos, 0), (x_pos + x_step, SIZE)))
         x_pos += x_step
+
+    last_step = diff if diff != 0 else x_step
+
+    bound_list.append(((x_pos, 0), (x_pos + last_step, SIZE)))
 
     return bound_list
 
 
-def get_arg_list(view, zoom) -> List[Any]:
-    bound_list = get_bound_list(cpu_count())
+def get_arg_list(view: View, zoom: float) \
+        -> List[Tuple[Bound, View, float, int]]:
+    """Pack arguments into a list of tuples to pass to build_mandelbrot_bounds()
+    """
+    bound_list = get_bound_list(CHUNK_COUNT)
 
     arg_list = []
 
@@ -62,8 +80,10 @@ def get_color(its: int) -> Tuple[int, int, int]:
     return cols[3]
 
 
-def scale(start: float, end: float, position: int, size: int) -> float:
-    coeff = abs(end - start) / size
+def scale(start: float, end: float, position: int) -> float:
+    """Scale pixel coord to real/imaginary part of a complex number
+    """
+    coeff = abs(end - start) / SIZE
 
     return start + position * coeff
 
@@ -72,7 +92,11 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
                             view: Tuple[float, float],
                             zoom: int,
                             max_iterations: int) \
-        -> List[Tuple[Pixel, int]]:
+        -> PixelDiverList:
+    """Associate each pixel with their respective number of iterations at
+    which they diverge.
+    https://en.wikipedia.org/wiki/Mandelbrot_set
+    """
 
     ul_bound, lr_bound = bounds
 
@@ -89,13 +113,11 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
     c_get_its.restype = cp.c_int
 
     for x in range(x0, x1):
-        scaled_x = scale(re_lo, re_hi, x, WIDTH)
+        scaled_x = scale(re_lo, re_hi, x)
         for y in range(y0, y1):
             pixel = (x, y)
 
-            scaled_y = scale(im_lo, im_hi, y, HEIGHT)
-
-            # print(f"x: {scaled_x}  y: {scaled_y}")
+            scaled_y = scale(im_lo, im_hi, y)
 
             iters = c_get_its(cp.c_longdouble(scaled_x),
                               cp.c_longdouble(scaled_y),
@@ -106,7 +128,10 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
     return it_list
 
 
-def build_image(it_map: List[Tuple[Pixel, int]]) -> Image:
+def build_image(it_map: PixelDiverList) -> Image:
+    """Build an Image object from list of pixels and their respective
+    divergency points.
+    """
     img = Image.new('RGB', (WIDTH, HEIGHT), 'white')
 
     for pixel, iters in it_map:
@@ -118,12 +143,13 @@ def build_image(it_map: List[Tuple[Pixel, int]]) -> Image:
 def generateMSImage(filepath: str) -> None:
     pl = Pool(cpu_count())
 
-    view = 0.0, 0.0
+    view: View = 0.0, 0.0
     zoom = 1/2
 
     arg_list = get_arg_list(view, zoom)
 
-    it_maps = pl.starmap(build_mandelbrot_bounds, arg_list, 1)
+    with Pool(cpu_count()) as pl:
+        it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
     im = list(chain.from_iterable(it_maps))  # might be too slow
 
@@ -148,35 +174,40 @@ def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
 def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
     # TODO: implenent gradial resolution rise
 
-    pl = Pool(cpu_count())
-
     screen = pg.display.set_mode((SIZE, SIZE))
+    render = True
 
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 exit(0)
-            if event.type == pg.MOUSEBUTTONDOWN:
+            elif event.type == pg.MOUSEBUTTONDOWN:
                 # TODO: implement mouse zooming
                 pass
+            elif event.type == pg.KEYUP:
+                if event.key == ord('q'):
+                    exit(0)
 
-        view = -1.767936363, -0.005048188
-        zoom = 100
+        if render:
+            render = False
+            view: View = -1.767936363, -0.005048188
+            zoom = 100
 
-        arg_list = get_arg_list(view, zoom)
+            arg_list = get_arg_list(view, zoom)
 
-        it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
+            with Pool(cpu_count()) as pl:
+                it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
-        it_map = list(chain.from_iterable(it_maps))  # might be too slow
+            it_map = list(chain.from_iterable(it_maps))  # might be too slow
 
-        for pixel, iters in it_map:
-            point = pg.Rect(pixel, (1, 1))
-            pg.draw.rect(screen, color_dict[iters], point)
+            for pixel, iters in it_map:
+                point = pg.Rect(pixel, (1, 1))
+                pg.draw.rect(screen, color_dict[iters], point)
 
-        pg.display.flip()
+            pg.display.flip()
 
 
-def get_args() -> Dict[str, Any]:
+def get_args() -> Dict[str, str]:
     parser = ap.ArgumentParser()
     parser.add_argument('-s,', '--size', required=True,
                         help='Size of the resulting image')
@@ -190,8 +221,14 @@ def get_args() -> Dict[str, Any]:
     parser.add_argument('-i', '--interactive', action='store_const',
                         const='interactive')
 
+    cpu_c = cpu_count() * 4
+    assert cpu_c is not None
+    parser.add_argument('-c', '--chunk-count',
+                        help='How many chunks to work on concurrently. Default 32',
+                        default=cpu_c)
+
     parser.add_argument('filepath', nargs='?',
-                        default=None,
+                        default='out.png',
                         help='Output filepath')
 
     args = vars(parser.parse_args())
@@ -204,7 +241,7 @@ if __name__ == "__main__":
 
     if args['interactive'] is None:
         if args['output'] is not None:
-            output = args['output']
+            output: str = args['output']
         else:
             output = args['filepath']
 
@@ -214,6 +251,8 @@ if __name__ == "__main__":
     WIDTH = int(args['size'])
     HEIGHT = int(args['size'])
     SIZE = HEIGHT
+
+    CHUNK_COUNT = int(args['chunk_count'])
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
