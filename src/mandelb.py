@@ -6,11 +6,11 @@ from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
 import ctypes as cp
-from os import getcwd
-from os import remove
+from os import getcwd, remove, cpu_count
 # from os import environ
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
+from itertools import chain
 
 
 Pixel = Tuple[int, int]
@@ -19,7 +19,31 @@ Pixel = Tuple[int, int]
 MAX_ITERATIONS = 1000
 WIDTH = 0
 HEIGHT = 0
-THREADS = 4
+SIZE = 0
+
+
+def get_bound_list(n: int) -> List[Tuple[Pixel, Pixel]]:
+    x_step = SIZE // n  # FIXME: what if not divisible? fix l8r.
+    x_pos = 0
+
+    bound_list = []
+
+    for x in range(n):
+        bound_list.append(((x_pos, 0), (x_pos + x_step, SIZE)))
+        x_pos += x_step
+
+    return bound_list
+
+
+def get_arg_list(view, zoom) -> List[Any]:
+    bound_list = get_bound_list(cpu_count())
+
+    arg_list = []
+
+    for bound in bound_list:
+        arg_list.append((bound, view, zoom, MAX_ITERATIONS))
+
+    return arg_list
 
 
 def get_color(its: int) -> Tuple[int, int, int]:
@@ -44,13 +68,19 @@ def scale(start: float, end: float, position: int, size: int) -> float:
     return start + position * coeff
 
 
-def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
+def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
+                            view: Tuple[float, float],
+                            zoom: int,
+                            max_iterations: int) \
         -> List[Tuple[Pixel, int]]:
 
     ul_bound, lr_bound = bounds
 
     x0, y0 = ul_bound
     x1, y1 = lr_bound
+
+    re_lo, re_hi = view[0] - 1 / zoom, view[0] + 1 / zoom
+    im_lo, im_hi = view[1] - 1 / zoom, view[1] + 1 / zoom
 
     it_list = []
 
@@ -59,17 +89,17 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
     c_get_its.restype = cp.c_int
 
     for x in range(x0, x1):
-        scaled_x = scale(-0.737654851, -0.717654851, x, WIDTH)
+        scaled_x = scale(re_lo, re_hi, x, WIDTH)
         for y in range(y0, y1):
             pixel = (x, y)
 
-            scaled_y = scale(-0.218141578, -0.199141578, y, HEIGHT)
+            scaled_y = scale(im_lo, im_hi, y, HEIGHT)
 
             # print(f"x: {scaled_x}  y: {scaled_y}")
 
             iters = c_get_its(cp.c_longdouble(scaled_x),
                               cp.c_longdouble(scaled_y),
-                              MAX_ITERATIONS)
+                              cp.c_int(max_iterations))
 
             it_list.append((pixel, iters))
 
@@ -86,15 +116,16 @@ def build_image(it_map: List[Tuple[Pixel, int]]) -> Image:
 
 
 def generateMSImage(filepath: str) -> None:
-    pl = Pool(THREADS)
-    bound_list = [((0, 0), (WIDTH // 2, HEIGHT // 2)),
-                  ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2)),
-                  ((0, HEIGHT // 2), (WIDTH // 2, HEIGHT)),
-                  ((WIDTH // 2, HEIGHT // 2), (WIDTH, HEIGHT))]
+    pl = Pool(cpu_count())
 
-    itmaps = pl.map(build_mandelbrot_bounds, bound_list)
+    view = 0.0, 0.0
+    zoom = 1/2
 
-    im = itmaps[0] + itmaps[1] + itmaps[2] + itmaps[3]
+    arg_list = get_arg_list(view, zoom)
+
+    it_maps = pl.starmap(build_mandelbrot_bounds, arg_list, 1)
+
+    im = list(chain.from_iterable(it_maps))  # might be too slow
 
     img = build_image(im)
 
@@ -115,34 +146,32 @@ def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
 
 
 def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
-    # lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
-    # c_get_its = lib.c_get_iterations
-    # c_get_its.restype = cp.c_int
+    # TODO: implenent gradial resolution rise
 
-    pl = Pool(THREADS)
-    bound_list = [((0, 0), (WIDTH // 2, HEIGHT // 2)),
-                  ((WIDTH // 2, 0), (WIDTH, HEIGHT // 2)),
-                  ((0, HEIGHT // 2), (WIDTH // 2, HEIGHT)),
-                  ((WIDTH // 2, HEIGHT // 2), (WIDTH, HEIGHT))]
+    pl = Pool(cpu_count())
 
-    size = WIDTH, HEIGHT
-
-    screen = pg.display.set_mode(size)
+    screen = pg.display.set_mode((SIZE, SIZE))
 
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 exit(0)
             if event.type == pg.MOUSEBUTTONDOWN:
+                # TODO: implement mouse zooming
                 pass
 
-        itmaps = pl.map(build_mandelbrot_bounds, bound_list)
+        view = -1.767936363, -0.005048188
+        zoom = 100
 
-        it_map = itmaps[0] + itmaps[1] + itmaps[2] + itmaps[3]
+        arg_list = get_arg_list(view, zoom)
+
+        it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
+
+        it_map = list(chain.from_iterable(it_maps))  # might be too slow
 
         for pixel, iters in it_map:
             point = pg.Rect(pixel, (1, 1))
-            pg.draw.rect(screen, get_color(iters), point)
+            pg.draw.rect(screen, color_dict[iters], point)
 
         pg.display.flip()
 
@@ -184,6 +213,7 @@ if __name__ == "__main__":
 
     WIDTH = int(args['size'])
     HEIGHT = int(args['size'])
+    SIZE = HEIGHT
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
