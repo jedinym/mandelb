@@ -1,12 +1,15 @@
 #!/usr/bin/python3
 
-from typing import Tuple, List
+from typing import Any, Tuple, List, Dict
 import cProfile
 from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
 import ctypes as cp
 from os import getcwd
+from os import remove
+# from os import environ
+# environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 
 
@@ -35,6 +38,12 @@ def get_color(its: int) -> Tuple[int, int, int]:
     return cols[3]
 
 
+def scale(start: float, end: float, position: int, size: int) -> float:
+    coeff = abs(end - start) / size
+
+    return start + position * coeff
+
+
 def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
         -> List[Tuple[Pixel, int]]:
 
@@ -50,9 +59,16 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel]) \
     c_get_its.restype = cp.c_int
 
     for x in range(x0, x1):
+        scaled_x = scale(-0.737654851, -0.717654851, x, WIDTH)
         for y in range(y0, y1):
             pixel = (x, y)
-            iters = c_get_its(x, y, WIDTH, HEIGHT, MAX_ITERATIONS)
+
+            scaled_y = scale(-0.218141578, -0.199141578, y, HEIGHT)
+
+            # print(f"x: {scaled_x}  y: {scaled_y}")
+
+            iters = c_get_its(cp.c_double(scaled_x), cp.c_double(scaled_y),
+                              MAX_ITERATIONS)
             it_list.append((pixel, iters))
 
     return it_list
@@ -114,7 +130,7 @@ def interactive_session() -> None:
         pg.display.flip()
 
 
-def init_parser() -> ap.ArgumentParser:
+def get_args() -> Dict[str, Any]:
     parser = ap.ArgumentParser()
     parser.add_argument('-s,', '--size', required=True,
                         help='Size of the resulting image')
@@ -132,12 +148,14 @@ def init_parser() -> ap.ArgumentParser:
                         default=None,
                         help='Output filepath')
 
-    return parser
+    args = vars(parser.parse_args())
+
+    return args
 
 
 if __name__ == "__main__":
-    parser = init_parser()
-    args = vars(parser.parse_args())
+    
+    args = get_args()
 
     if args['interactive'] is None:
         if args['output'] is not None:
@@ -153,6 +171,7 @@ if __name__ == "__main__":
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
+        remove(output)
         exit(0)
 
     if args['interactive'] is not None:
