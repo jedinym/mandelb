@@ -17,26 +17,33 @@ Pixel = Tuple[int, int]
 
 
 MAX_ITERATIONS = 1000
+CHUNK_COUNT = 32  # how many chunks to create
 WIDTH = 0
 HEIGHT = 0
 SIZE = 0
 
 
-def get_bound_list(n: int) -> List[Tuple[Pixel, Pixel]]:
-    x_step = SIZE // n  # FIXME: what if not divisible? fix l8r.
+def get_bound_list(n):
+    x_step = SIZE // n
+    diff = SIZE % n
+
     x_pos = 0
 
     bound_list = []
 
-    for x in range(n):
+    for x in range(n - 1):
         bound_list.append(((x_pos, 0), (x_pos + x_step, SIZE)))
         x_pos += x_step
+
+    last_step = diff if diff != 0 else x_step
+
+    bound_list.append(((x_pos, 0), (x_pos + last_step, SIZE)))
 
     return bound_list
 
 
 def get_arg_list(view, zoom) -> List[Any]:
-    bound_list = get_bound_list(cpu_count())
+    bound_list = get_bound_list(CHUNK_COUNT)
 
     arg_list = []
 
@@ -123,7 +130,8 @@ def generateMSImage(filepath: str) -> None:
 
     arg_list = get_arg_list(view, zoom)
 
-    it_maps = pl.starmap(build_mandelbrot_bounds, arg_list, 1)
+    with Pool(cpu_count()) as pl:
+        it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
     im = list(chain.from_iterable(it_maps))  # might be too slow
 
@@ -148,8 +156,6 @@ def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
 def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
     # TODO: implenent gradial resolution rise
 
-    pl = Pool(cpu_count())
-
     screen = pg.display.set_mode((SIZE, SIZE))
 
     while True:
@@ -165,7 +171,8 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
 
         arg_list = get_arg_list(view, zoom)
 
-        it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
+        with Pool(cpu_count()) as pl:
+            it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
         it_map = list(chain.from_iterable(it_maps))  # might be too slow
 
@@ -189,6 +196,9 @@ def get_args() -> Dict[str, Any]:
                         help='Maximum mandelb. set iterations')
     parser.add_argument('-i', '--interactive', action='store_const',
                         const='interactive')
+    parser.add_argument('-c', '--chunk-count',
+                        help='How many chunks to work on concurrently. Default 32',
+                        default=cpu_count() * 4)
 
     parser.add_argument('filepath', nargs='?',
                         default=None,
@@ -214,6 +224,8 @@ if __name__ == "__main__":
     WIDTH = int(args['size'])
     HEIGHT = int(args['size'])
     SIZE = HEIGHT
+
+    CHUNK_COUNT = int(args['chunk_count'])
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
