@@ -44,9 +44,7 @@ def get_bound_list(n: int) -> List[Bound]:
         x_pos += x_step
 
     last_step = diff if diff != 0 else x_step
-    print(SIZE)
-    print(n)
-    print(SIZE % n)
+
     bound_list.append(((x_pos, 0), (x_pos + last_step, SIZE)))
 
     return bound_list
