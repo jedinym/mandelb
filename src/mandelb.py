@@ -11,6 +11,8 @@ from os import getcwd, remove, cpu_count
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 from itertools import chain
+import time
+import numba
 
 
 Pixel = Tuple[int, int]
@@ -97,7 +99,7 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
     which they diverge.
     https://en.wikipedia.org/wiki/Mandelbrot_set
     """
-     
+
     ul_bound, lr_bound = bounds
 
     x0, y0 = ul_bound
@@ -171,6 +173,13 @@ def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
     return color_dict
 
 
+def draw_image(it_map: PixelDiverList, screen) -> None:
+
+    for pixel, iters in it_map:
+        point = pg.Rect(pixel, (1, 1))
+        pg.draw.rect(screen, color_dict[iters], point)
+
+
 def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
     # TODO: implenent gradial resolution rise
 
@@ -200,9 +209,7 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
 
             it_map = list(chain.from_iterable(it_maps))  # might be too slow
 
-            for pixel, iters in it_map:
-                point = pg.Rect(pixel, (1, 1))
-                pg.draw.rect(screen, color_dict[iters], point)
+            draw_image(it_map, screen)
 
             pg.display.flip()
 
@@ -223,7 +230,7 @@ def get_args() -> Dict[str, str]:
 
     cpu_c = cpu_count()
     assert cpu_c is not None
-    cpu_c *= 4 
+    cpu_c *= 4
 
     parser.add_argument('-c', '--chunk-count',
                         help='How many chunks to work on concurrently. Default 32',
