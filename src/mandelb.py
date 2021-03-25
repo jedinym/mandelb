@@ -97,7 +97,7 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
     which they diverge.
     https://en.wikipedia.org/wiki/Mandelbrot_set
     """
-
+     
     ul_bound, lr_bound = bounds
 
     x0, y0 = ul_bound
@@ -221,8 +221,10 @@ def get_args() -> Dict[str, str]:
     parser.add_argument('-i', '--interactive', action='store_const',
                         const='interactive')
 
-    cpu_c = cpu_count() * 4
+    cpu_c = cpu_count()
     assert cpu_c is not None
+    cpu_c *= 4 
+
     parser.add_argument('-c', '--chunk-count',
                         help='How many chunks to work on concurrently. Default 32',
                         default=cpu_c)
