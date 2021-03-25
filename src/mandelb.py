@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from functools import lru_cache
 from typing import Sized, Tuple, List, Dict
 import cProfile
 from PIL import Image
@@ -21,6 +22,7 @@ View = Tuple[float, float]
 
 
 MAX_ITERATIONS = 1000
+LOWEST_RESOLUTION = 16
 CHUNK_COUNT = 32  # how many chunks to create
 WIDTH = 0
 HEIGHT = 0
@@ -51,7 +53,7 @@ def get_bound_list(n: int) -> List[Bound]:
     return bound_list
 
 
-def get_arg_list(view: View, zoom: float) \
+def get_arg_list(view: View, zoom: float, resolution: int) \
         -> List[Tuple[Bound, View, float, int]]:
     """Pack arguments into a list of tuples to pass to build_mandelbrot_bounds()
     """
@@ -60,7 +62,7 @@ def get_arg_list(view: View, zoom: float) \
     arg_list = []
 
     for bound in bound_list:
-        arg_list.append((bound, view, zoom, MAX_ITERATIONS))
+        arg_list.append((bound, view, zoom, MAX_ITERATIONS, resolution))
 
     return arg_list
 
@@ -81,6 +83,7 @@ def get_color(its: int) -> Tuple[int, int, int]:
     return cols[3]
 
 
+@lru_cache
 def scale(start: float, end: float, position: int) -> float:
     """Scale pixel coord to real/imaginary part of a complex number
     """
@@ -92,7 +95,8 @@ def scale(start: float, end: float, position: int) -> float:
 def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
                             view: Tuple[float, float],
                             zoom: int,
-                            max_iterations: int) \
+                            max_iterations: int,
+                            resolution: int) \
         -> PixelDiverList:
     """Associate each pixel with their respective number of iterations at
     which they diverge.
@@ -113,9 +117,9 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
     c_get_its = lib.c_get_iterations
     c_get_its.restype = cp.c_int
 
-    for x in range(x0, x1):
+    for x in range(x0, x1, resolution):
         scaled_x = scale(re_lo, re_hi, x)
-        for y in range(y0, y1):
+        for y in range(y0, y1, resolution):
             pixel = (x, y)
 
             scaled_y = scale(im_lo, im_hi, y)
@@ -170,10 +174,10 @@ def load_colors(filepath: str) -> Dict[int, Tuple[int, int, int]]:
     return color_dict
 
 
-def draw_image(it_map: PixelDiverList, screen) -> None:
+def draw_image(it_map: PixelDiverList, screen, resolution) -> None:
 
     for pixel, iters in it_map:
-        point = pg.Rect(pixel, (1, 1))
+        point = pg.Rect(pixel, (resolution, resolution))
         pg.draw.rect(screen, color_dict[iters], point)
 
 
@@ -184,6 +188,7 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
     render = True
     view: View = 0.0, 0.0
     zoom = 1/2
+    resolution = LOWEST_RESOLUTION
 
     while True:
         re_lo, re_hi = view[0] - 1 / zoom, view[0] + 1 / zoom
@@ -198,11 +203,14 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
                 exit(0)
             elif event.type == pg.MOUSEBUTTONDOWN:
                 view = sc_x, sc_y
-                if event.button == 1:
+                if event.button == 1:  # left click
                     zoom *= zoom_coeff
-                elif event.button == 3:
-                    zoom //= zoom_coeff
+                elif event.button == 3:  # right click
+                    # FIXME: fix zero division
+                    if zoom > 1:
+                        zoom //= zoom_coeff
                 render = True
+                resolution = LOWEST_RESOLUTION
 
             elif event.type == pg.KEYUP:
                 if event.key == ord('q'):
@@ -210,6 +218,7 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
                 elif event.key == ord('r'):
                     view = (0.0, 0.0)
                     zoom = 0.5
+                    resolution = LOWEST_RESOLUTION
                     render = True
 
         os.system('clear||cls')  # cls for windows compat.
@@ -217,18 +226,21 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
         print(sc_x, sc_y)
 
         if render:
-            render = False
+            if resolution == 1:
+                render = False
 
-            arg_list = get_arg_list(view, zoom)
+            arg_list = get_arg_list(view, zoom, resolution)
 
             with Pool(cpu_count()) as pl:
                 it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
             it_map = list(chain.from_iterable(it_maps))  # might be too slow
 
-            draw_image(it_map, screen)
+            draw_image(it_map, screen, resolution)
 
             pg.display.flip()
+
+            resolution //= 2
 
 
 def get_args() -> Dict[str, str]:
@@ -244,6 +256,8 @@ def get_args() -> Dict[str, str]:
                         help='Maximum mandelb. set iterations')
     parser.add_argument('-i', '--interactive', action='store_const',
                         const='interactive')
+    parser.add_argument('-r', '--lowest-resolution',
+                        default=16)
 
     cpu_c = cpu_count()
     assert cpu_c is not None
@@ -279,6 +293,8 @@ if __name__ == "__main__":
     SIZE = HEIGHT
 
     CHUNK_COUNT = int(args['chunk_count'])
+
+    LOWEST_RESOLUTION = int(args['lowest_resolution'])
 
     if args['benchmark'] is not None:
         cProfile.run(fr'generateMSImage("{output}")')
