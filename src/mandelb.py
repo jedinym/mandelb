@@ -6,13 +6,12 @@ from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
 import ctypes as cp
-from os import getcwd, remove, cpu_count
+from os import getcwd, remove, cpu_count, system
+import os
 # from os import environ
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 from itertools import chain
-import time
-import numba
 
 
 Pixel = Tuple[int, int]
@@ -143,14 +142,12 @@ def build_image(it_map: PixelDiverList) -> Image:
 
 
 def generateMSImage(filepath: str) -> None:
-    pl = Pool(cpu_count())
-
     view: View = 0.0, 0.0
     zoom = 1/2
 
     arg_list = get_arg_list(view, zoom)
 
-    with Pool(cpu_count()) as pl:
+    with Pool(CHUNK_COUNT) as pl:
         it_maps = pl.starmap(build_mandelbrot_bounds, arg_list)
 
     im = list(chain.from_iterable(it_maps))  # might be too slow
@@ -185,22 +182,34 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
 
     screen = pg.display.set_mode((SIZE, SIZE))
     render = True
+    view: View = 0.0, 0.0
+    zoom = 1/2
 
     while True:
+        re_lo, re_hi = view[0] - 1 / zoom, view[0] + 1 / zoom
+        im_lo, im_hi = view[1] - 1 / zoom, view[1] + 1 / zoom
+        m_x, m_y = pg.mouse.get_pos()
+        sc_x = scale(re_lo, re_hi, m_x)
+        sc_y = scale(im_lo, im_hi, m_y)
+        zoom_coeff = 2
+
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 exit(0)
             elif event.type == pg.MOUSEBUTTONDOWN:
-                # TODO: implement mouse zooming
-                pass
+                view = sc_x, sc_y
+                zoom *= zoom_coeff
+                render = True
+
             elif event.type == pg.KEYUP:
                 if event.key == ord('q'):
                     exit(0)
 
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(sc_x, sc_y)
+
         if render:
             render = False
-            view: View = -1.767936363, -0.005048188
-            zoom = 100
 
             arg_list = get_arg_list(view, zoom)
 
@@ -233,7 +242,7 @@ def get_args() -> Dict[str, str]:
     cpu_c *= 4
 
     parser.add_argument('-c', '--chunk-count',
-                        help='How many chunks to work on concurrently. Default 32',
+                        help='How many ch. to work on concurrently. Def. 32',
                         default=cpu_c)
 
     parser.add_argument('filepath', nargs='?',
