@@ -198,14 +198,22 @@ def interactive_session(color_dict: Dict[int, Tuple[int, int, int]]) -> None:
                 exit(0)
             elif event.type == pg.MOUSEBUTTONDOWN:
                 view = sc_x, sc_y
-                zoom *= zoom_coeff
+                if event.button == 1:
+                    zoom *= zoom_coeff
+                elif event.button == 3:
+                    zoom //= zoom_coeff
                 render = True
 
             elif event.type == pg.KEYUP:
                 if event.key == ord('q'):
                     exit(0)
+                elif event.key == ord('r'):
+                    view = (0.0, 0.0)
+                    zoom = 0.5
+                    render = True
 
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('clear||cls')  # cls for windows compat.
+
         print(sc_x, sc_y)
 
         if render:
