@@ -1,14 +1,14 @@
 #!/usr/bin/python3
 
-from functools import lru_cache
-from typing import Sized, Tuple, List, Dict
+from typing import Tuple, List, Dict
 import cProfile
 from PIL import Image
 import argparse as ap
 from multiprocessing import Pool
 import ctypes as cp
-from os import getcwd, remove, cpu_count, system
+from os import getcwd, remove, cpu_count
 import os
+import sys
 # from os import environ
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
@@ -27,6 +27,7 @@ CHUNK_COUNT = 32  # how many chunks to create
 WIDTH = 0
 HEIGHT = 0
 SIZE = 0
+C_LIB = None
 
 
 def get_bound_list(n: int) -> List[Bound]:
@@ -35,6 +36,7 @@ def get_bound_list(n: int) -> List[Bound]:
     Return a list of bounds -> (<topleft_pixel>, <bottomright_pixel>)
     """
     # TODO: this might be wrong
+    # FIXME: it actually is
     x_step = SIZE // n
     diff = SIZE % n
 
@@ -83,13 +85,25 @@ def get_color(its: int) -> Tuple[int, int, int]:
     return cols[3]
 
 
-@lru_cache
 def scale(start: float, end: float, position: int) -> float:
     """Scale pixel coord to real/imaginary part of a complex number
     """
     coeff = abs(end - start) / SIZE
 
     return start + position * coeff
+
+
+def get_iterations(scaled_x: float, scaled_y: float,
+                   max_iterations: int) -> int:
+
+    c_get_its = C_LIB.c_get_iterations
+    c_get_its.restype = cp.c_int
+
+    iters = c_get_its(cp.c_longdouble(scaled_x),
+                      cp.c_longdouble(scaled_y),
+                      cp.c_int(max_iterations))
+
+    return iters
 
 
 def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
@@ -113,10 +127,6 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
 
     it_list = []
 
-    lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
-    c_get_its = lib.c_get_iterations
-    c_get_its.restype = cp.c_int
-
     for x in range(x0, x1, resolution):
         scaled_x = scale(re_lo, re_hi, x)
         for y in range(y0, y1, resolution):
@@ -124,9 +134,7 @@ def build_mandelbrot_bounds(bounds: Tuple[Pixel, Pixel],
 
             scaled_y = scale(im_lo, im_hi, y)
 
-            iters = c_get_its(cp.c_longdouble(scaled_x),
-                              cp.c_longdouble(scaled_y),
-                              cp.c_int(max_iterations))
+            iters = get_iterations(scaled_x, scaled_y, MAX_ITERATIONS)
 
             it_list.append((pixel, iters))
 
@@ -291,6 +299,13 @@ if __name__ == "__main__":
     WIDTH = int(args['size'])
     HEIGHT = int(args['size'])
     SIZE = HEIGHT
+
+    try:
+        C_LIB = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
+    except OSError:
+        print("ERROR: Library file not found in lib/ directory.",
+              file=sys.stderr)
+        exit(1)
 
     CHUNK_COUNT = int(args['chunk_count'])
 
