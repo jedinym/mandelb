@@ -7,13 +7,6 @@
 #include "mandelb.h"
 
 
-double scale(int num, int size)
-{
-    //printf("%d\n", num);
-    return ((num - (size / 2)) / ((double) size / 4));
-}
-
-
 int c_get_iterations(long double scaled_x, long double scaled_y, int max_iters)
 {
     int iters = 0;
