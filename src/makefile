@@ -6,3 +6,6 @@ lib/mandelb.o: mandelb.c
 
 mandelb.so: lib/mandelb.o
 	cc $(CFLAGS) -fPIC -shared -o lib/mandelb.so lib/mandelb.o
+
+clean:
+	rm -f lib/mandelb.so lib/mandelb.o
