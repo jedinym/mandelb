@@ -8,6 +8,7 @@ import os
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 from itertools import chain
+import time
 
 
 Pixel = Tuple[int, int]
@@ -140,13 +141,14 @@ class MandelbrotGenerator:
 
         return start + position * coeff
 
-    def get_iterations(self, c_lib: cp.cdll, scaled_x: float, scaled_y: float) -> int:
+    def get_iterations(self, c_lib: cp.CDLL, scaled_x: float, scaled_y: float)\
+            -> int:
         c_get_its = c_lib.c_get_iterations
         c_get_its.restype = cp.c_int
 
-        iters = c_get_its(cp.c_longdouble(scaled_x),
-                          cp.c_longdouble(scaled_y),
-                          cp.c_int(self.max_iterations))
+        iters: int = c_get_its(cp.c_longdouble(scaled_x),
+                               cp.c_longdouble(scaled_y),
+                               cp.c_int(self.max_iterations))
 
         return iters
 
@@ -223,9 +225,9 @@ class MandelbrotGenerator:
         color_dict[self.max_iterations] = (0, 0, 0)
         return color_dict
 
-    def draw_image(self, it_map: PixelDiverList, screen, resolution) -> None:
+    def draw_image(self, it_map: PixelDiverList, screen, resolution: int)\
+            -> None:
 
         for pixel, iters in it_map:
             point = pg.Rect(pixel, (resolution, resolution))
             pg.draw.rect(screen, self.color_dict[iters], point)
-
