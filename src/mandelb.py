@@ -55,13 +55,6 @@ if __name__ == "__main__":
 
     size = int(args['size'])
 
-    # try:
-    #     C_LIB = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
-    # except OSError:
-    #     print("ERROR: Library file not found in lib/ directory.",
-    #           file=sys.stderr)
-    #     exit(1)
-
     chunk_count = int(args['chunk_count'])
 
     lowest_resolution = int(args['lowest_resolution'])

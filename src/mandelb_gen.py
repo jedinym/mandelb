@@ -49,7 +49,6 @@ class MandelbrotGenerator:
                     if event.button == 1:  # left click
                         zoom *= zoom_coeff
                     elif event.button == 3:  # right click
-                        # FIXME: fix zero division
                         if zoom > 1:
                             zoom //= zoom_coeff
                     render = True
@@ -86,26 +85,25 @@ class MandelbrotGenerator:
                 resolution //= 2
 
     def get_bound_list(self) -> List[Bound]:
-        """Divide the screen/view into <n> chunks for faster processing.
+        """Divide the screen/view into <self.chunk_count> chunks for faster processing.
 
         Return a list of bounds -> (<topleft_pixel>, <bottomright_pixel>)
         """
-        # TODO: this might be wrong
-        # FIXME: it actually is
         x_step = self.size // self.chunk_count
-        diff = self.size % self.chunk_count
+        rest = self.size % self.chunk_count
 
         x_pos = 0
 
         bound_list: List[Bound] = []
 
-        for x in range(self.chunk_count - 1):
-            bound_list.append(((x_pos, 0), (x_pos + x_step, self.size)))
+        for x in range(self.chunk_count):
+            x_step_end = x_pos + x_step
+
+            if x == self.chunk_count - 1:
+                x_step_end += rest
+
+            bound_list.append(((x_pos, 0), (x_step_end, self.size)))
             x_pos += x_step
-
-        last_step = diff if diff != 0 else x_step
-
-        bound_list.append(((x_pos, 0), (x_pos + last_step, self.size)))
 
         return bound_list
 
@@ -202,7 +200,7 @@ class MandelbrotGenerator:
         view: View = 0.0, 0.0
         zoom = 1 / 2
 
-        arg_list = self.get_arg_list(view, zoom)
+        arg_list = self.get_arg_list(view, zoom, 1)
 
         with Pool(self.chunk_count) as pl:
             it_maps = pl.starmap(self.build_mandelbrot_bounds, arg_list)
