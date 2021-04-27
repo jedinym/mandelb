@@ -8,26 +8,12 @@ import os
 # environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame as pg
 from itertools import chain
-import sys
 
 
 Pixel = Tuple[int, int]
 PixelDiverList = List[Tuple[Pixel, int]]
 Bound = Tuple[Pixel, Pixel]
 View = Tuple[float, float]
-
-# this has to be handled, here because
-# multiprocessing doesn't work well with ctype pointers
-try:
-    c_lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')
-    c_get_iterations = c_lib.c_get_iterations
-    c_get_iterations.restype = cp.c_int
-except OSError:
-    print("Error loading library", file=sys.stderr)
-    exit(1)
-except AttributeError:
-    print("Function c_get_iterations not found in library", file=sys.stderr)
-    exit(2)
 
 
 class MandelbrotGenerator:
@@ -154,12 +140,13 @@ class MandelbrotGenerator:
 
         return start + position * coeff
 
-    def get_iterations(self, scaled_x: float, scaled_y: float)\
-            -> int:
+    def get_iterations(self, c_lib: cp.cdll, scaled_x: float, scaled_y: float) -> int:
+        c_get_its = c_lib.c_get_iterations
+        c_get_its.restype = cp.c_int
 
-        iters: int = c_get_iterations(cp.c_longdouble(scaled_x),
-                                      cp.c_longdouble(scaled_y),
-                                      cp.c_int(self.max_iterations))
+        iters = c_get_its(cp.c_longdouble(scaled_x),
+                          cp.c_longdouble(scaled_y),
+                          cp.c_int(self.max_iterations))
 
         return iters
 
@@ -183,6 +170,8 @@ class MandelbrotGenerator:
 
         it_list = []
 
+        c_lib = cp.cdll.LoadLibrary(getcwd() + '/lib/mandelb.so')  # TODO: rethink this
+
         for x in range(x0, x1, resolution):
             scaled_x = self.scale(re_lo, re_hi, x)
             for y in range(y0, y1, resolution):
@@ -190,7 +179,7 @@ class MandelbrotGenerator:
 
                 scaled_y = self.scale(im_lo, im_hi, y)
 
-                iters = self.get_iterations(scaled_x, scaled_y)
+                iters = self.get_iterations(c_lib, scaled_x, scaled_y)
 
                 it_list.append((pixel, iters))
 
@@ -234,9 +223,10 @@ class MandelbrotGenerator:
         color_dict[self.max_iterations] = (0, 0, 0)
         return color_dict
 
-    def draw_image(self, it_map: PixelDiverList, screen, resolution: int)\
-            -> None:
+    def draw_image(self, it_map: PixelDiverList, screen, resolution) -> None:
 
         for pixel, iters in it_map:
             point = pg.Rect(pixel, (resolution, resolution))
             pg.draw.rect(screen, self.color_dict[iters], point)
+
+
